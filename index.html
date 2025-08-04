@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genealogía del Arte (1930-Actualidad)</title>
+    <title>Genealogía del Arte (Diseño Mejorado)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,16 +16,15 @@
             --md-sys-color-tertiary: #047857; /* Tema */
             --md-sys-color-surface: #f8fafc;
             --md-sys-color-on-surface: #1a1c1e;
-            --md-sys-color-surface-variant: #eef2f6;
+            --md-sys-color-surface-container: #f0f4f8;
             --md-sys-color-on-surface-variant: #44474a;
             --md-sys-color-outline: #74777b;
             --md-sys-color-outline-variant: #c4c7cb;
         }
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: var(--md-sys-color-surface-variant);
+            background-color: var(--md-sys-color-surface-container);
             color: var(--md-sys-color-on-surface);
-            overflow: hidden;
         }
         .graph-container {
             background-color: var(--md-sys-color-surface);
@@ -55,14 +54,25 @@
         }
         .node text {
             pointer-events: none;
-            font-size: 12px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 700;
             fill: var(--md-sys-color-on-surface);
+            text-anchor: middle;
+            opacity: 0; /* Oculto por defecto */
+            transition: opacity 0.2s;
+            paint-order: stroke;
+            stroke: white;
+            stroke-width: 4px;
+            stroke-linecap: butt;
+            stroke-linejoin: miter;
+        }
+        .node:hover text {
+            opacity: 1; /* Visible en hover */
         }
         .decade-label {
             font-size: 2.5rem;
             font-weight: 700;
-            fill: var(--md-sys-color-surface-variant);
+            fill: var(--md-sys-color-surface-container);
             text-anchor: middle;
         }
         .decade-line {
@@ -75,73 +85,71 @@
             opacity: 0.15;
         }
         .highlighted circle {
-            stroke-width: 3px;
-            transform: scale(1.1);
+            stroke-width: 3.5px;
+            transform: scale(1.15);
         }
         .highlighted.artista circle { stroke: #d97706; }
         .highlighted.movimiento circle { stroke: #0d9488; }
         .highlighted.tema circle { stroke: var(--md-sys-color-tertiary); }
         .highlighted text {
-            font-weight: 700;
+            opacity: 1;
         }
         .link-highlighted {
             stroke-opacity: 1;
             stroke-width: 3px;
         }
         
-        /* Estilos Panel de Información */
-        .info-panel {
-            background-color: var(--md-sys-color-surface);
+        /* Panel de Información inferior */
+        #info-container {
+            transition: all 0.5s ease-in-out;
+            transform: translateY(100%);
         }
-        .info-card {
-             background-color: var(--md-sys-color-surface-variant);
+        #info-container.visible {
+            transform: translateY(0);
         }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="flex flex-col h-screen">
 
-    <div class="flex h-screen">
-        <!-- Contenedor principal del SVG -->
-        <div class="w-3/4 h-full flex flex-col relative graph-container shadow-lg">
-            <div class="p-4 absolute top-0 left-0 z-10 max-w-lg">
-                <h1 class="text-2xl font-bold text-gray-800">Genealogía del Arte: 1930 - Actualidad</h1>
-                <p class="text-sm text-gray-600">Una línea de tiempo estable. Haz clic en un nodo para explorar.</p>
-            </div>
-            <div class="flex-grow overflow-auto">
-                <svg id="art-map" width="100%"></svg>
-            </div>
-            <div class="absolute bottom-4 right-4 flex items-center space-x-4 text-sm bg-white/80 p-2 rounded-lg backdrop-blur-sm shadow-md border border-gray-200">
-                 <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #0ea5e9; border: 1px solid #0c4a6e;"></div><span>Movimiento</span></div>
-                 <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #f59e0b; border: 1px solid #78350f;"></div><span>Artista</span></div>
-                 <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #10b981; border: 1px solid #065f46;"></div><span>Tema</span></div>
-                 <div class="flex items-center ml-2 pl-2 border-l border-gray-300">
-                    <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link influence" style="stroke-width: 2px;"></line></svg>
-                    <span>Influencia</span>
-                </div>
-                <div class="flex items-center">
-                    <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link reaction"></line></svg>
-                    <span>Reacción</span>
-                </div>
-            </div>
+    <!-- Contenedor principal del SVG -->
+    <div class="flex-grow w-full relative overflow-hidden graph-container">
+        <div class="p-4 absolute top-0 left-0 z-20 max-w-lg">
+            <h1 class="text-2xl font-bold text-gray-800">Genealogía del Arte: 1930 - Actualidad</h1>
+            <p class="text-sm text-gray-600">Pasa el cursor para ver nombres. Haz clic para ver detalles.</p>
         </div>
-
-        <!-- Panel de información lateral -->
-        <div class="w-1/4 h-full bg-gray-100 p-4 overflow-y-auto info-panel border-l border-gray-300">
-            <div id="info-panel-content" class="sticky top-4">
-                <div class="p-4 rounded-xl info-card">
-                    <h2 id="info-title" class="text-xl font-bold mb-1 text-gray-900">Bienvenido</h2>
-                    <p id="info-type" class="text-xs font-medium uppercase tracking-wider text-gray-600 mb-3">Panel de Información</p>
-                    <p id="info-description" class="text-sm text-gray-700">
-                        Explora las complejas conexiones del arte moderno y contemporáneo.
-                    </p>
-                </div>
-                <div id="info-connections" class="mt-4"></div>
+        <div id="svg-wrapper" class="w-full h-full overflow-auto">
+            <svg id="art-map" width="100%"></svg>
+        </div>
+        <div class="absolute bottom-4 right-4 flex items-center space-x-4 text-sm bg-white/80 p-2 rounded-lg backdrop-blur-sm shadow-md border border-gray-200 z-20">
+             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #0ea5e9; border: 1px solid #0c4a6e;"></div><span>Movimiento</span></div>
+             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #f59e0b; border: 1px solid #78350f;"></div><span>Artista</span></div>
+             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #10b981; border: 1px solid #065f46;"></div><span>Tema</span></div>
+             <div class="flex items-center ml-2 pl-2 border-l border-gray-300">
+                <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link influence" style="stroke-width: 2px;"></line></svg>
+                <span>Influencia</span>
+            </div>
+            <div class="flex items-center">
+                <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link reaction"></line></svg>
+                <span>Reacción</span>
             </div>
         </div>
     </div>
 
+    <!-- Panel de información inferior -->
+    <div id="info-container" class="w-full bg-white border-t-2 border-gray-200 shadow-2xl p-6 z-30 flex-shrink-0">
+        <button id="close-info-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <div id="info-content">
+            <!-- El contenido se inyectará aquí -->
+        </div>
+    </div>
+
+
     <script>
-    // --- Definición de Datos ---
+    // --- Definición de Datos (Sin cambios) ---
     const artData = {
         nodes: [
             // Pre-1930
@@ -294,23 +302,23 @@
         ]
     };
 
-    // --- Lógica de la Visualización Estática ---
+    // --- Lógica de la Visualización ---
     document.addEventListener('DOMContentLoaded', () => {
         const svg = d3.select("#art-map");
-        const width = document.getElementById('art-map').parentElement.clientWidth;
+        const svgWrapper = document.getElementById('svg-wrapper');
+        const width = svgWrapper.clientWidth;
         
-        const nodeRadius = 12;
-        const decadeHeight = 350; // Altura de cada carril de década
-        const padding = { top: 50, right: 150, bottom: 50, left: 50 };
+        const nodeRadius = 14;
+        const decadeHeight = 300;
+        const padding = { top: 60, right: 50, bottom: 50, left: 50 };
 
-        // Agrupar nodos por década
         const decades = Array.from(d3.group(artData.nodes, d => d.decade).keys()).sort(d3.ascending);
         const height = decades.length * decadeHeight + padding.top + padding.bottom;
         svg.attr("height", height);
 
         const nodesById = new Map(artData.nodes.map(node => [node.id, node]));
 
-        // Calcular posiciones estáticas para los nodos
+        // Calcular posiciones estáticas
         decades.forEach((decade, i) => {
             const yPos = i * decadeHeight + padding.top + decadeHeight / 2;
             const decadeNodes = artData.nodes.filter(n => n.decade === decade);
@@ -322,31 +330,16 @@
             });
         });
 
-        // Dibujar carriles y etiquetas de década
+        // Dibujar carriles de década
         const decadeGroup = svg.append("g").attr("id", "decade-markers");
         decades.forEach((decade, i) => {
             const yPos = i * decadeHeight + padding.top;
-            decadeGroup.append("line")
-                .attr("class", "decade-line")
-                .attr("x1", 0)
-                .attr("x2", width)
-                .attr("y1", yPos)
-                .attr("y2", yPos);
-
-            decadeGroup.append("text")
-                .attr("class", "decade-label")
-                .attr("x", width / 2)
-                .attr("y", yPos + decadeHeight / 2 + 15)
-                .text(`${decade}s`);
+            decadeGroup.append("line").attr("class", "decade-line").attr("x1", 0).attr("x2", width).attr("y1", yPos).attr("y2", yPos);
+            decadeGroup.append("text").attr("class", "decade-label").attr("x", width / 2).attr("y", yPos + decadeHeight / 2 + 15).text(`${decade}s`);
         });
-        // Línea final
-        decadeGroup.append("line")
-            .attr("class", "decade-line")
-            .attr("x1", 0).attr("x2", width)
-            .attr("y1", decades.length * decadeHeight + padding.top).attr("y2", decades.length * decadeHeight + padding.top);
+        decadeGroup.append("line").attr("class", "decade-line").attr("x1", 0).attr("x2", width).attr("y1", height - padding.bottom).attr("y2", height - padding.bottom);
 
-
-        // Dibujar enlaces (curvas)
+        // Dibujar enlaces
         const linkGroup = svg.append("g").attr("class", "links");
         const links = linkGroup.selectAll("path")
             .data(artData.links)
@@ -358,7 +351,7 @@
                 if (!source || !target) return "";
                 const dx = target.x - source.x;
                 const dy = target.y - source.y;
-                const dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Factor de curvatura
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.8;
                 return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
             });
 
@@ -371,28 +364,29 @@
             .attr("transform", d => `translate(${d.x},${d.y})`);
 
         const nodeColors = { artista: '#f59e0b', movimiento: '#0ea5e9', tema: '#10b981' };
-        node.append("circle")
-            .attr("r", nodeRadius)
-            .style("fill", d => nodeColors[d.type]);
-        node.append("text")
-            .text(d => d.name)
-            .attr("text-anchor", "middle")
-            .attr("y", nodeRadius + 15);
+        node.append("circle").attr("r", nodeRadius).style("fill", d => nodeColors[d.type]);
+        node.append("text").text(d => d.name).attr("y", -nodeRadius - 5);
 
-        // --- Interacción ---
+        // --- Lógica de Interacción y Panel Inferior ---
+        const infoContainer = document.getElementById('info-container');
+        const infoContent = document.getElementById('info-content');
+        const closeInfoBtn = document.getElementById('close-info-btn');
         let activeNodeId = null;
+
         node.on('click', (event, d) => {
+            event.stopPropagation();
             if (activeNodeId === d.id) {
-                activeNodeId = null;
-                resetHighlights();
-                updateInfoPanel(null);
+                hideInfoPanel();
             } else {
                 activeNodeId = d.id;
                 highlightNodeAndConnections(d.id);
                 updateInfoPanel(d);
+                showInfoPanel();
             }
-            event.stopPropagation();
         });
+
+        svg.on('click', hideInfoPanel);
+        closeInfoBtn.addEventListener('click', hideInfoPanel);
 
         function highlightNodeAndConnections(nodeId) {
             const connectedNodeIds = new Set([nodeId]);
@@ -405,8 +399,6 @@
             node.classed('highlighted', n => n.id === nodeId);
             links.classed('dimmed', l => !connectedLinkSet.has(l));
             links.classed('link-highlighted', l => connectedLinkSet.has(l));
-
-            // Traer al frente los elementos resaltados
             node.filter('.highlighted').raise();
             links.filter('.link-highlighted').raise();
         }
@@ -415,52 +407,55 @@
             node.classed('dimmed', false).classed('highlighted', false);
             links.classed('dimmed', false).classed('link-highlighted', false);
         }
+        
+        function showInfoPanel() {
+            infoContainer.classList.add('visible');
+        }
 
-        // --- Panel de Información ---
-        const infoTitle = document.getElementById('info-title');
-        const infoType = document.getElementById('info-type');
-        const infoDescription = document.getElementById('info-description');
-        const infoConnections = document.getElementById('info-connections');
+        function hideInfoPanel() {
+            activeNodeId = null;
+            resetHighlights();
+            infoContainer.classList.remove('visible');
+        }
 
         function updateInfoPanel(d) {
-            if (!d) {
-                infoTitle.textContent = 'Bienvenido';
-                infoType.textContent = 'Panel de Información';
-                infoDescription.textContent = 'Explora las complejas conexiones del arte moderno y contemporáneo.';
-                infoConnections.innerHTML = '';
-                return;
-            }
-            infoTitle.textContent = d.name;
-            infoType.textContent = `${d.type} - ${d.decade}s`;
-            infoDescription.textContent = d.description;
-            infoConnections.innerHTML = '<h3 class="text-md font-semibold mt-4 mb-2 text-gray-800">Conexiones</h3>';
-            const connectionsList = document.createElement('ul');
-            connectionsList.className = 'space-y-2';
-            const relatedLinks = artData.links.filter(l => l.source === d.id || l.target === d.id);
-            if (relatedLinks.length === 0) {
-                infoConnections.innerHTML += '<p class="text-sm text-gray-500">No hay conexiones directas en este conjunto de datos.</p>';
-                return;
-            }
-            relatedLinks.forEach(link => {
-                const otherNode = nodesById.get(link.source === d.id ? link.target : link.source);
-                const listItem = document.createElement('li');
-                listItem.className = 'p-2.5 rounded-lg flex items-start text-sm info-card';
-                const colorDot = `<div class="w-2.5 h-2.5 rounded-full mr-3 mt-1 flex-shrink-0" style="background-color: ${nodeColors[otherNode.type]}"></div>`;
-                
-                const relationColor = link.type === 'influence' ? 'text-cyan-700' : 'text-red-700';
-                const relationLabel = link.label || (link.type === 'influence' ? 'Influye a' : 'Reacciona a');
+            if (!d) return;
 
-                let connectionText;
-                if (link.source === d.id) {
-                    connectionText = `<div><span class="font-medium ${relationColor}">${relationLabel}</span> <strong class="text-gray-900">${otherNode.name}</strong></div>`;
-                } else {
-                    const inverseLabel = link.label ? `(Relacionado por: ${link.label})` : (link.type === 'influence' ? 'Influido por' : 'Provoca reacción de');
-                    connectionText = `<div><strong class="text-gray-900">${otherNode.name}</strong> <span class="font-medium ${relationColor}">${inverseLabel}</span></div>`;
-                }
-                listItem.innerHTML = `${colorDot} ${connectionText}`;
-                connectionsList.appendChild(listItem);
-            });
-            infoConnections.appendChild(connectionsList);
+            const relatedLinks = artData.links.filter(l => l.source === d.id || l.target === d.id);
+            let connectionsHtml = '<p class="text-sm text-gray-500">No hay conexiones directas en este conjunto de datos.</p>';
+            
+            if (relatedLinks.length > 0) {
+                connectionsHtml = relatedLinks.map(link => {
+                    const otherNode = nodesById.get(link.source === d.id ? link.target : link.source);
+                    const relationColor = link.type === 'influence' ? 'text-cyan-700' : 'text-red-700';
+                    const relationLabel = link.label || (link.type === 'influence' ? 'Influye a' : 'Reacciona a');
+                    let connectionText;
+                     if (link.source === d.id) {
+                        connectionText = `<div><span class="font-medium ${relationColor}">${relationLabel}</span> <strong class="text-gray-900">${otherNode.name}</strong></div>`;
+                    } else {
+                        const inverseLabel = link.label ? `(Relacionado por: ${link.label})` : (link.type === 'influence' ? 'Influido por' : 'Provoca reacción de');
+                        connectionText = `<div><strong class="text-gray-900">${otherNode.name}</strong> <span class="font-medium ${relationColor}">${inverseLabel}</span></div>`;
+                    }
+                    return `<li class="flex items-start text-sm p-2 rounded-md hover:bg-gray-200">
+                                <div class="w-2.5 h-2.5 rounded-full mr-3 mt-1 flex-shrink-0" style="background-color: ${nodeColors[otherNode.type]}"></div>
+                                ${connectionText}
+                            </li>`;
+                }).join('');
+            }
+
+            infoContent.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1">
+                        <h2 class="text-2xl font-bold text-gray-900">${d.name}</h2>
+                        <p class="text-sm font-medium uppercase tracking-wider text-gray-500 mb-4">${d.type} - ${d.decade}s</p>
+                        <p class="text-base text-gray-700">${d.description}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">Conexiones</h3>
+                        <ul class="space-y-1">${connectionsHtml}</ul>
+                    </div>
+                </div>
+            `;
         }
     });
     </script>
