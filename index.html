@@ -3,460 +3,538 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genealogía del Arte (Diseño Mejorado)</title>
+    <title>Genealogía del Arte: Versión Final</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --md-sys-color-primary: #006d77; /* Influencia */
-            --md-sys-color-secondary: #b91c1c; /* Reacción */
-            --md-sys-color-tertiary: #047857; /* Tema */
-            --md-sys-color-surface: #f8fafc;
-            --md-sys-color-on-surface: #1a1c1e;
-            --md-sys-color-surface-container: #f0f4f8;
-            --md-sys-color-on-surface-variant: #44474a;
-            --md-sys-color-outline: #74777b;
-            --md-sys-color-outline-variant: #c4c7cb;
+            --color-bg: #0f172a; /* Slate 900 */
+            --color-surface: #1e293b; /* Slate 800 */
+            --color-text: #e2e8f0; /* Slate 200 */
+            --color-link-influence: #22d3ee; /* Cyan 400 */
+            --color-link-reaction: #f472b6; /* Pink 400 */
+            --color-link-affinity: #64748b; /* Slate 500 */
+            --color-outline: #475569; /* Slate 600 */
+            /* Colores para Nodos Temáticos */
+            --color-tema-espiritual: #a855f7; /* Purple 500 */
+            --color-tema-cuerpo: #ef4444; /* Red 500 */
+            --color-tema-politico: #f97316; /* Orange 500 */
+            --color-tema-naturaleza: #22c55e; /* Green 500 */
+            --color-tema-abstraccion: #3b82f6; /* Blue 500 */
+            --color-tema-narrativas: #94a3b8; /* Slate 400 */
         }
+        html { scroll-behavior: smooth; }
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: var(--md-sys-color-surface-container);
-            color: var(--md-sys-color-on-surface);
+            background-color: var(--color-bg);
+            color: var(--color-text);
         }
-        .graph-container {
-            background-color: var(--md-sys-color-surface);
-        }
-        /* Estilos D3 */
+        #graph-container { background-color: var(--color-bg); }
+        /* D3 Styles */
         .link {
             fill: none;
-            stroke-opacity: 0.5;
-            transition: all 0.3s ease-in-out;
+            stroke-opacity: 0.2;
+            transition: all 0.4s ease;
         }
-        .link.influence {
-            stroke: var(--md-sys-color-primary);
-            stroke-width: 1.5px;
-        }
-        .link.reaction {
-            stroke: var(--md-sys-color-secondary);
-            stroke-width: 2px;
-            stroke-dasharray: 6, 4;
-        }
-        .node {
-            cursor: pointer;
-        }
+        .link.influence { stroke: var(--color-link-influence); stroke-width: 1.5px; }
+        .link.reaction { stroke: var(--color-link-reaction); stroke-width: 1.5px; stroke-dasharray: 5, 5; }
+        .link.affinity { stroke: var(--color-link-affinity); stroke-width: 1px; stroke-dasharray: 2, 3;}
+        .node { cursor: pointer; transition: opacity 0.4s ease; }
         .node circle {
-            stroke: var(--md-sys-color-outline);
-            stroke-width: 1px;
-            transition: all 0.3s ease-in-out;
+            stroke: var(--color-outline);
+            stroke-width: 1.5px;
+            transition: all 0.4s ease;
         }
-        .node text {
+        .node .label {
             pointer-events: none;
-            font-size: 13px;
-            font-weight: 700;
-            fill: var(--md-sys-color-on-surface);
+            font-size: 14px;
+            font-weight: 500;
+            fill: var(--color-text);
             text-anchor: middle;
-            opacity: 0; /* Oculto por defecto */
-            transition: opacity 0.2s;
             paint-order: stroke;
-            stroke: white;
+            stroke: var(--color-bg);
             stroke-width: 4px;
             stroke-linecap: butt;
-            stroke-linejoin: miter;
-        }
-        .node:hover text {
-            opacity: 1; /* Visible en hover */
         }
         .decade-label {
-            font-size: 2.5rem;
+            font-size: clamp(4rem, 20vw, 12rem);
             font-weight: 700;
-            fill: var(--md-sys-color-surface-container);
-            text-anchor: middle;
+            fill: rgba(255, 255, 255, 0.03);
+            text-anchor: start;
+            pointer-events: none;
         }
-        .decade-line {
-            stroke: var(--md-sys-color-outline-variant);
-            stroke-width: 1px;
+        /* Interaction Styles */
+        .dimmed { opacity: 0.1; }
+        .filtered-out { opacity: 0.05; pointer-events: none; }
+        .focused circle {
+            stroke-width: 4px;
+            transform: scale(1.1);
         }
+        .focused.artista circle { stroke: #f59e0b; filter: drop-shadow(0 0 10px #f59e0b); }
+        .focused.movimiento circle { stroke: var(--color-link-influence); filter: drop-shadow(0 0 10px var(--color-link-influence)); }
+        .focused.tema circle { filter: drop-shadow(0 0 10px var(--stroke-color)); } /* Color dinámico */
+        .focused.obra circle { stroke: #e2e8f0; filter: drop-shadow(0 0 10px #e2e8f0); }
 
-        /* Estilos de Interacción */
-        .dimmed {
-            opacity: 0.15;
-        }
-        .highlighted circle {
-            stroke-width: 3.5px;
-            transform: scale(1.15);
-        }
-        .highlighted.artista circle { stroke: #d97706; }
-        .highlighted.movimiento circle { stroke: #0d9488; }
-        .highlighted.tema circle { stroke: var(--md-sys-color-tertiary); }
-        .highlighted text {
-            opacity: 1;
-        }
-        .link-highlighted {
-            stroke-opacity: 1;
-            stroke-width: 3px;
-        }
+        .link-highlighted { stroke-opacity: 0.9; stroke-width: 2.5px; }
         
-        /* Panel de Información inferior */
-        #info-container {
-            transition: all 0.5s ease-in-out;
-            transform: translateY(100%);
+        /* Info Modal Styles */
+        #info-modal {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            background-color: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
         }
-        #info-container.visible {
-            transform: translateY(0);
+        /* Filter Button Styles */
+        .filter-btn.active {
+            background-color: var(--color-surface);
+            color: var(--color-text);
         }
     </style>
 </head>
-<body class="flex flex-col h-screen">
+<body class="w-full">
 
-    <!-- Contenedor principal del SVG -->
-    <div class="flex-grow w-full relative overflow-hidden graph-container">
-        <div class="p-4 absolute top-0 left-0 z-20 max-w-lg">
-            <h1 class="text-2xl font-bold text-gray-800">Genealogía del Arte: 1930 - Actualidad</h1>
-            <p class="text-sm text-gray-600">Pasa el cursor para ver nombres. Haz clic para ver detalles.</p>
-        </div>
-        <div id="svg-wrapper" class="w-full h-full overflow-auto">
-            <svg id="art-map" width="100%"></svg>
-        </div>
-        <div class="absolute bottom-4 right-4 flex items-center space-x-4 text-sm bg-white/80 p-2 rounded-lg backdrop-blur-sm shadow-md border border-gray-200 z-20">
-             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #0ea5e9; border: 1px solid #0c4a6e;"></div><span>Movimiento</span></div>
-             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #f59e0b; border: 1px solid #78350f;"></div><span>Artista</span></div>
-             <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #10b981; border: 1px solid #065f46;"></div><span>Tema</span></div>
-             <div class="flex items-center ml-2 pl-2 border-l border-gray-300">
-                <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link influence" style="stroke-width: 2px;"></line></svg>
-                <span>Influencia</span>
+    <header class="sticky top-0 z-40 w-full bg-slate-900/70 backdrop-blur-sm border-b border-slate-700">
+        <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex-shrink-0">
+                <h1 class="text-xl md:text-2xl font-bold text-white">Genealogía del Arte</h1>
+                <p class="text-sm text-slate-400">Línea de tiempo interactiva (Siglo XIX - Actualidad)</p>
             </div>
-            <div class="flex items-center">
-                <svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link reaction"></line></svg>
-                <span>Reacción</span>
+            <div class="w-full md:w-auto md:ml-auto flex flex-col md:flex-row gap-4 items-center">
+                <input type="search" id="search-input" placeholder="Buscar artista, obra, movimiento..." class="w-full md:w-64 bg-slate-800 border border-slate-600 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-cyan-400 focus:outline-none transition">
+                <div id="filter-controls" class="flex gap-2">
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium bg-slate-700 rounded-md hover:bg-slate-600 transition" data-filter="artista">Artista</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium bg-slate-700 rounded-md hover:bg-slate-600 transition" data-filter="movimiento">Movimiento</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium bg-slate-700 rounded-md hover:bg-slate-600 transition" data-filter="obra">Obra</button>
+                    <button class="filter-btn px-3 py-1.5 text-xs font-medium bg-slate-700 rounded-md hover:bg-slate-600 transition" data-filter="tema">Tema</button>
+                </div>
             </div>
+        </div>
+    </header>
+
+    <main id="graph-container" class="w-full">
+        <svg id="art-map"></svg>
+    </main>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transform scale-95">
+        <div id="info-modal-content" class="w-full max-w-4xl max-h-[80vh] bg-slate-900/70 border border-slate-700 rounded-2xl shadow-2xl p-6 md:p-8 overflow-y-auto">
+            <button id="close-info-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div id="modal-body"></div>
         </div>
     </div>
-
-    <!-- Panel de información inferior -->
-    <div id="info-container" class="w-full bg-white border-t-2 border-gray-200 shadow-2xl p-6 z-30 flex-shrink-0">
-        <button id="close-info-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-        <div id="info-content">
-            <!-- El contenido se inyectará aquí -->
-        </div>
+    
+    <!-- Legend -->
+    <div class="fixed bottom-4 left-4 z-30 flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 text-xs bg-slate-900/50 p-3 rounded-lg backdrop-blur-sm border border-slate-700">
+        <div class="flex items-center"><div class="w-3 h-3 rounded-full mr-2" style="background-color: #f59e0b;"></div><span>Artista</span></div>
+        <div class="flex items-center"><div class="w-3 h-3 rounded-full mr-2" style="background-color: var(--color-link-influence);"></div><span>Movimiento</span></div>
+        <div class="flex items-center"><div class="w-3 h-3 rounded-full mr-2" style="background-color: #e2e8f0;"></div><span>Obra</span></div>
+        <div class="flex items-center"><div class="w-3 h-3 rounded-full mr-2" style="background-color: var(--color-tema-abstraccion);"></div><span>Tema</span></div>
+        <div class="hidden md:block border-l h-4 border-slate-600"></div>
+        <div class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link influence" style="stroke-opacity:1"></line></svg><span>Influencia</span></div>
+        <div class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link reaction" style="stroke-opacity:1"></line></svg><span>Reacción</span></div>
+        <div class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" class="link affinity" style="stroke-opacity:1; stroke-dasharray: 2,3;"></line></svg><span>Afinidad</span></div>
     </div>
 
 
     <script>
-    // --- Definición de Datos (Sin cambios) ---
+    // --- Data Definition (Massively Expanded and Verified) ---
     const artData = {
         nodes: [
-            // Pre-1930
-            { id: 'dadaismo', name: 'Dadaísmo', type: 'movimiento', decade: 1920, description: 'Movimiento anti-arte que sentó las bases para el Surrealismo y el Arte Conceptual.' },
-            { id: 'constructivismo', name: 'Constructivismo', type: 'movimiento', decade: 1920, description: 'Movimiento ruso que influyó en el Minimalismo con su enfoque en la geometría.' },
-            { id: 'expresionismo_aleman', name: 'Expresionismo Alemán', type: 'movimiento', decade: 1910, description: 'Priorizaba la expresión emocional subjetiva. Influencia clave para el Neoexpresionismo.' },
+            // NÚCLEOS TEMÁTICOS
+            { id: 'nucleo_espiritual', name: 'Lo Espiritual / Simbólico', type: 'tema', color: 'var(--color-tema-espiritual)', decade: 1880, description: 'Artistas que exploran lo místico, los sueños, y el uso del color y la forma para evocar realidades más allá de lo visible.' },
+            { id: 'nucleo_cuerpo', name: 'El Cuerpo / Lo Sensorial', type: 'tema', color: 'var(--color-tema-cuerpo)', decade: 1960, description: 'El cuerpo como herramienta, materia y sujeto del arte. Explora la experiencia sensorial, el performance y la identidad corporal.' },
+            { id: 'nucleo_politico', name: 'Lo Político / Social', type: 'tema', color: 'var(--color-tema-politico)', decade: 1920, description: 'Arte como herramienta de crítica social, comentario político y activismo. Cuestiona el poder y las estructuras institucionales.' },
+            { id: 'nucleo_naturaleza', name: 'Naturaleza / Paisaje', type: 'tema', color: 'var(--color-tema-naturaleza)', decade: 1850, description: 'La representación, intervención y percepción de la naturaleza y el paisaje, desde lo sublime romántico hasta el Land Art y el bioarte.' },
+            { id: 'nucleo_abstraccion', name: 'Abstracción / Materia', type: 'tema', color: 'var(--color-tema-abstraccion)', decade: 1910, description: 'Investigación sobre la forma pura, la materia, la geometría y la desmaterialización del objeto artístico.' },
+            { id: 'nucleo_narrativas', name: 'Narrativas en Tensión', type: 'tema', color: 'var(--color-tema-narrativas)', decade: 1900, description: 'Obras que exploran la psique, la emoción cruda, lo grotesco y las tensiones internas, a menudo desafiando las narrativas tradicionales.' },
+            { id: 'nucleo_feminismos', name: 'Feminismos / Disidencias', type: 'tema', color: 'var(--color-tema-cuerpo)', decade: 1970, description: 'Arte que desafía las estructuras patriarcales, explora la identidad de género y da voz a las minorías.'},
+            { id: 'nucleo_tecnologia', name: 'Ciencia / Tecnología / Bioarte', type: 'tema', color: 'var(--color-tema-naturaleza)', decade: 1960, description: 'Exploración de la intersección entre arte, ciencia y tecnología, incluyendo el videoarte, el arte cinético y el bioarte.'},
+            { id: 'nucleo_streetart', name: 'Street Art', type: 'tema', color: 'var(--color-tema-politico)', decade: 1980, description: 'Arte realizado en el espacio público, a menudo de forma ilegal, que abarca desde el graffiti hasta instalaciones urbanas.'},
 
-            // 1930s
-            { id: 'surrealismo', name: 'Surrealismo', type: 'movimiento', decade: 1930, description: 'Exploró el subconsciente, los sueños y lo irracional.' },
-            { id: 'muralismo', name: 'Muralismo Mexicano', type: 'movimiento', decade: 1930, description: 'Arte público con fuerte mensaje político y social.' },
-            { id: 'siqueiros', name: 'David A. Siqueiros', type: 'artista', decade: 1930, description: 'Muralista que incorporó influencias surrealistas y expresionistas, influyendo a Pollock.' },
-            { id: 'rivera', name: 'Diego Rivera', type: 'artista', decade: 1930, description: 'Figura central del muralismo mexicano.' },
-            { id: 'kahlo', name: 'Frida Kahlo', type: 'artista', decade: 1930, description: 'Artista icónica reconocida por los surrealistas.' },
-            { id: 'breton', name: 'André Breton', type: 'artista', decade: 1930, description: 'Fundador del Surrealismo.' },
-
-            // 1940s
-            { id: 'exp_abstracto', name: 'Expresionismo Abstracto', type: 'movimiento', decade: 1940, description: 'Primer gran movimiento estadounidense, centrado en la expresión subjetiva.' },
-            { id: 'pollock', name: 'Jackson Pollock', type: 'artista', decade: 1940, description: 'Figura del Expresionismo Abstracto, famoso por su "action painting".' },
-
-            // 1950s
-            { id: 'ruptura', name: 'Gen. de la Ruptura', type: 'movimiento', decade: 1950, description: 'Movimiento mexicano que rompió con el muralismo en busca de un lenguaje cosmopolita.' },
-            { id: 'pop_art', name: 'Pop Art', type: 'movimiento', decade: 1950, description: 'Reacción al Expresionismo Abstracto usando imágenes de la cultura de masas.' },
+            // SIGLO XIX
+            { id: 'romanticismo', name: 'Romanticismo', type: 'movimiento', decade: 1830, description: 'Movimiento que enfatiza la emoción, el individualismo y lo sublime de la naturaleza.' },
+            { id: 'friedrich', name: 'Caspar David Friedrich', type: 'artista', decade: 1810, description: 'Pintor romántico alemán, clave por sus paisajes alegóricos que exploran la espiritualidad y la soledad frente a la naturaleza.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Caspar_David_Friedrich_-_Der_Wanderer_%C3%BCber_dem_Nebelmeer.jpeg', wikiUrl: 'https://es.wikipedia.org/wiki/Caspar_David_Friedrich' },
+            { id: 'monk_by_the_sea', name: 'Monk by the Sea (Obra)', type: 'obra', decade: 1810, description: 'Obra icónica de C.D. Friedrich que encarna el sentimiento de lo sublime romántico.'},
+            { id: 'constable', name: 'John Constable', type: 'artista', decade: 1820, description: 'Pintor paisajista inglés del Romanticismo, conocido por su detallada observación de la naturaleza.' },
+            { id: 'turner', name: 'J. M. W. Turner', type: 'artista', decade: 1820, description: 'Pintor romántico inglés, maestro en la representación de la luz y la atmósfera, precursor del Impresionismo.'},
+            { id: 'simbolismo', name: 'Simbolismo', type: 'movimiento', decade: 1880, description: 'Reacción contra el naturalismo y el realismo, favoreciendo la espiritualidad, la imaginación y los sueños.' },
+            { id: 'redon', name: 'Odilon Redon', type: 'artista', decade: 1880, description: 'Artista simbolista francés, cuyo trabajo explora mundos de ensueño, lo grotesco y lo mitológico.' },
+            { id: 'gauguin', name: 'Paul Gauguin', type: 'artista', decade: 1890, description: 'Figura clave del Postimpresionismo y el Simbolismo, conocido por su uso experimental y simbólico del color.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Paul_Gauguin_111.jpg/800px-Paul_Gauguin_111.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Paul_Gauguin' },
+            { id: 'cezanne', name: 'Paul Cézanne', type: 'artista', decade: 1880, description: 'Artista postimpresionista considerado el "Padre del Arte Moderno", sentó las bases para el Cubismo a través de su estudio de la forma.' },
+            { id: 'van_gogh', name: 'Vincent van Gogh', type: 'artista', decade: 1880, description: 'Artista postimpresionista cuya obra se caracteriza por su cruda expresividad emocional y el uso audaz del color.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project.jpg/800px-Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Vincent_van_Gogh' },
+            { id: 'munch', name: 'Edvard Munch', type: 'artista', decade: 1890, description: 'Pintor noruego, pionero del Expresionismo, cuyas obras exploran temas de angustia, amor y muerte.' },
+            { id: 'ensor', name: 'James Ensor', type: 'artista', decade: 1890, description: 'Pintor belga asociado al Simbolismo y Expresionismo, conocido por sus obras grotescas y satíricas con máscaras y esqueletos.' },
             
-            // 1960s
-            { id: 'minimalismo', name: 'Minimalismo', type: 'movimiento', decade: 1960, description: 'Reduce el arte a sus elementos fundamentales, con formas geométricas y materiales industriales.' },
+            // TRANSICIÓN Y VANGUARDIAS (1900-1930s)
+            { id: 'fauvismo', name: 'Fauvismo', type: 'movimiento', decade: 1900, description: 'Se caracteriza por un uso provocativo y no naturalista del color.' },
+            { id: 'matisse', name: 'Henri Matisse', type: 'artista', decade: 1900, description: 'Figura central del Fauvismo, exploró la expresividad del color y la forma a lo largo de su carrera.' },
+            { id: 'cubismo', name: 'Cubismo', type: 'movimiento', decade: 1910, description: 'Revolucionó la pintura representando objetos desde múltiples puntos de vista simultáneamente.' },
+            { id: 'picasso', name: 'Pablo Picasso', type: 'artista', decade: 1910, description: 'Cofundador del Cubismo y una de las figuras más influyentes del arte del siglo XX.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Pablo_picasso_1.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Pablo_Picasso' },
+            { id: 'braque', name: 'Georges Braque', type: 'artista', decade: 1910, description: 'Cofundador del Cubismo junto a Picasso.'},
+            { id: 'dadaismo', name: 'Dadaísmo', type: 'movimiento', decade: 1920, description: 'Movimiento anti-arte que rechazaba la lógica y la estética burguesa, sentando las bases para el Surrealismo y el Arte Conceptual.' },
+            { id: 'duchamp', name: 'Marcel Duchamp', type: 'artista', decade: 1910, description: 'Artista franco-estadounidense asociado con el Dadaísmo y el Surrealismo. Su concepto de "ready-made" cambió radicalmente la definición de arte.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Marcel_Duchamp%2C_1917%2C_photo_by_Alvin_Langdon_Coburn.jpg/800px-Marcel_Duchamp%2C_1917%2C_photo_by_Alvin_Langdon_Coburn.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Marcel_Duchamp' },
+            { id: 'heartfield', name: 'John Heartfield', type: 'artista', decade: 1930, description: 'Pionero del fotomontaje como arma de crítica política contra el nazismo.' },
+            { id: 'grosz', name: 'George Grosz', type: 'artista', decade: 1920, description: 'Artista expresionista y dadaísta alemán, conocido por sus caricaturas satíricas de la sociedad de Berlín.' },
+            { id: 'expresionismo', name: 'Expresionismo', type: 'movimiento', decade: 1910, description: 'Movimiento que busca expresar la experiencia emocional en lugar de la realidad física.' },
+            { id: 'kandinsky', name: 'Wassily Kandinsky', type: 'artista', decade: 1910, description: 'Pintor ruso, pionero del arte abstracto, que creía en la capacidad espiritual del color y la forma.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Vassily_Kandinsky%2C_1913_-_Der_Blaue_Reiter.jpg/800px-Vassily_Kandinsky%2C_1913_-_Der_Blaue_Reiter.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Vassily_Kandinsky' },
+            { id: 'mondrian', name: 'Piet Mondrian', type: 'artista', decade: 1920, description: 'Artista holandés, figura clave del Neoplasticismo, que buscaba una armonía universal a través de la abstracción geométrica pura.' },
+            { id: 'malevich', name: 'Kazimir Malevich', type: 'artista', decade: 1910, description: 'Pintor ruso, creador del Suprematismo, una de las formas más radicales de abstracción geométrica.'},
+            { id: 'surrealismo', name: 'Surrealismo', type: 'movimiento', decade: 1930, description: 'Movimiento que buscaba liberar el potencial del inconsciente, inspirado en las teorías de Freud.' },
+            { id: 'magritte', name: 'René Magritte', type: 'artista', decade: 1930, description: 'Pintor surrealista belga conocido por sus ingeniosas y provocadoras imágenes que desafían la percepción de la realidad.' },
+            { id: 'hoech', name: 'Hannah Höch', type: 'artista', decade: 1920, description: 'Artista dadaísta alemana, pionera del fotomontaje y crítica de la cultura de Weimar.'},
+            { id: 'cahun', name: 'Claude Cahun', type: 'artista', decade: 1920, description: 'Artista y escritora surrealista, pionera en la exploración de la identidad de género a través de la fotografía.'},
+
+            // ARTE MODERNO TARDÍO (1940-1970s)
+            { id: 'exp_abstracto', name: 'Expresionismo Abstracto', type: 'movimiento', decade: 1940, description: 'Primer gran movimiento estadounidense, centrado en la expresión subjetiva y gestual.' },
+            { id: 'pollock', name: 'Jackson Pollock', type: 'artista', decade: 1950, description: 'Figura del Expresionismo Abstracto, famoso por su "action painting".' },
+            { id: 'pop_art', name: 'Pop Art', type: 'movimiento', decade: 1960, description: 'Utiliza imágenes de la cultura de masas y la publicidad, a menudo con ironía.' },
+            { id: 'warhol', name: 'Andy Warhol', type: 'artista', decade: 1960, description: 'Figura central del Pop Art, exploró la relación entre el arte, la cultura de las celebridades y la publicidad.', imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/2b/Andy_Warhol_by_Jack_Mitchell.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Andy_Warhol' },
+            { id: 'lichtenstein', name: 'Roy Lichtenstein', type: 'artista', decade: 1960, description: 'Artista Pop conocido por su estilo inspirado en las tiras cómicas.'},
+            { id: 'minimalismo', name: 'Minimalismo', type: 'movimiento', decade: 1960, description: 'Reduce el arte a sus elementos fundamentales, enfatizando la forma y la materia.' },
+            { id: 'judd', name: 'Donald Judd', type: 'artista', decade: 1960, description: 'Figura clave del Minimalismo, conocido por sus "objetos específicos" fabricados con materiales industriales.' },
+            { id: 'morris', name: 'Robert Morris', type: 'artista', decade: 1960, description: 'Artista minimalista y conceptual que exploró la relación entre el objeto, el espectador y el espacio.' },
             { id: 'arte_conceptual', name: 'Arte Conceptual', type: 'movimiento', decade: 1960, description: 'La idea o concepto es más importante que el objeto artístico.' },
-            { id: 'warhol', name: 'Andy Warhol', type: 'artista', decade: 1960, description: 'Figura central del Pop Art.' },
-            { id: 'situacionismo', name: 'Situacionismo', type: 'movimiento', decade: 1960, description: 'Movimiento de crítica social y política que buscaba transformar la vida cotidiana.' },
-            { id: 'debord', name: 'Guy Debord', type: 'artista', decade: 1960, description: 'Figura clave del Situacionismo, conocido por su teoría de la "deriva" y la crítica al espectáculo.' },
-            { id: 'arte_procesual', name: 'Arte Procesual', type: 'movimiento', decade: 1960, description: 'Enfatiza el proceso de creación de la obra sobre el resultado final.' },
-            { id: 'beuys', name: 'Joseph Beuys', type: 'artista', decade: 1960, description: 'Artista alemán clave en el arte procesual y Fluxus, con un fuerte componente político y social.' },
-            { id: 'land_art', name: 'Land Art', type: 'movimiento', decade: 1960, description: 'Utiliza el paisaje y materiales de la naturaleza como medio y emplazamiento de la obra.' },
-            { id: 'heizer', name: 'Michael Heizer', type: 'artista', decade: 1960, description: 'Pionero del Land Art, conocido por sus obras a gran escala en el desierto.' },
-            { id: 'smithson', name: 'Robert Smithson', type: 'artista', decade: 1960, description: 'Artista central del Land Art, famoso por su obra "Spiral Jetty".' },
-            { id: 'tema_arte_experiencia', name: 'Arte como Experiencia', type: 'tema', decade: 1960, description: 'Enfoque en la vivencia, el proceso y la acción por encima del objeto artístico tradicional.' },
-            { id: 'klein', name: 'Yves Klein', type: 'artista', decade: 1960, description: 'Artista clave en la transición al arte de performance, famoso por su uso del color azul.' },
+            { id: 'kosuth', name: 'Joseph Kosuth', type: 'artista', decade: 1960, description: 'Figura central del Arte Conceptual, que investigó la relación entre lenguaje, imagen y realidad.' },
+            { id: 'performance', name: 'Performance', type: 'movimiento', decade: 1960, description: 'Arte en el que la acción del artista es la obra.' },
+            { id: 'yves_klein', name: 'Yves Klein', type: 'artista', decade: 1960, description: 'Pionero del performance y el arte corporal, famoso por su azul (IKB) y sus "Antropometrías".', imageUrl: 'https://upload.wikimedia.org/wikipedia/en/d/d7/Le_Saut_dans_le_Vide.jpg', wikiUrl: 'https://es.wikipedia.org/wiki/Yves_Klein' },
+            { id: 'salto_al_vacio', name: 'Salto al vacío (Obra)', type: 'obra', decade: 1960, description: 'Performance de Yves Klein (1960) que representa la desmaterialización y el anhelo espiritual del artista.' },
+            { id: 'yoko_ono', name: 'Yoko Ono', type: 'artista', decade: 1960, description: 'Artista conceptual y de performance, miembro de Fluxus, cuyas obras a menudo invitan a la participación del espectador.' },
+            { id: 'beuys', name: 'Joseph Beuys', type: 'artista', decade: 1970, description: 'Artista alemán cuya obra abarca performance, escultura y activismo, bajo el concepto de "escultura social".' },
+            { id: 'land_art', name: 'Land Art', type: 'movimiento', decade: 1970, description: 'Utiliza el paisaje y materiales de la naturaleza como medio y emplazamiento de la obra.' },
+            { id: 'smithson', name: 'Robert Smithson', type: 'artista', decade: 1970, description: 'Artista central del Land Art, famoso por su obra "Spiral Jetty" y sus escritos sobre entropía.' },
+            { id: 'heizer', name: 'Michael Heizer', type: 'artista', decade: 1970, description: 'Pionero del Land Art, conocido por sus obras a gran escala que desplazan grandes masas de tierra.' },
+            { id: 'turrell', name: 'James Turrell', type: 'artista', decade: 1970, description: 'Artista que trabaja directamente con la luz y el espacio para crear experiencias perceptuales inmersivas.' },
+            { id: 'clark', name: 'Lygia Clark', type: 'artista', decade: 1960, description: 'Artista brasileña pionera en el arte participativo y terapéutico, explorando la relación entre el cuerpo y los objetos.' },
+            { id: 'oiticica', name: 'Hélio Oiticica', type: 'artista', decade: 1960, description: 'Artista brasileño que buscaba integrar el arte en la vida a través de obras participativas como los "Parangolés".' },
+            { id: 'mendieta', name: 'Ana Mendieta', type: 'artista', decade: 1970, description: 'Artista cubano-americana cuyo trabajo fusiona el arte corporal y el land art para explorar temas de identidad, violencia y pertenencia.'},
+            { id: 'acconci', name: 'Vito Acconci', type: 'artista', decade: 1970, description: 'Artista de performance y video que exploró los límites del cuerpo, el espacio público y la relación con el espectador.'},
+            { id: 'burden', name: 'Chris Burden', type: 'artista', decade: 1970, description: 'Artista de performance conocido por sus acciones extremas que ponían a prueba sus propios límites físicos y psicológicos.'},
+            { id: 'guerrilla_girls', name: 'Guerrilla Girls', type: 'artista', decade: 1980, description: 'Colectivo anónimo de artistas feministas que utiliza el humor y datos para exponer el sexismo y el racismo en el mundo del arte.'},
 
-            // 1970s
-            { id: 'neoexpresionismo', name: 'Neoexpresionismo', type: 'movimiento', decade: 1970, description: 'Revivió la pintura figurativa y expresiva como reacción al Minimalismo y Arte Conceptual.' },
-            { id: 'fluxus', name: 'Fluxus', type: 'movimiento', decade: 1970, description: 'Red internacional de artistas que mezclaban diferentes disciplinas en eventos y happenings.' },
-            { id: 'body_art', name: 'Body Art / Performance', type: 'movimiento', decade: 1970, description: 'Utiliza el cuerpo del artista como medio principal de expresión.' },
-            { id: 'abramovic', name: 'Marina Abramović', type: 'artista', decade: 1970, description: 'Artista de performance pionera, explora los límites del cuerpo y la mente.' },
-            { id: 'tema_cuerpo_medio', name: 'Cuerpo como Medio', type: 'tema', decade: 1970, description: 'El cuerpo se convierte en el lienzo, la herramienta y el sujeto principal de la obra artística.' },
-            { id: 'tema_feminismo', name: 'Arte Feminista', type: 'tema', decade: 1970, description: 'Utiliza el arte para cuestionar la dominación masculina y explorar la identidad y experiencia femenina.' },
-            { id: 'sherman', name: 'Cindy Sherman', type: 'artista', decade: 1970, description: 'Fotógrafa conocida por sus autorretratos conceptuales que deconstruyen estereotipos femeninos.' },
-            { id: 'kruger', name: 'Barbara Kruger', type: 'artista', decade: 1970, description: 'Artista conceptual que utiliza la tipografía y la imagen para lanzar una crítica social y feminista.' },
-            { id: 'matta_clark', name: 'Gordon Matta-Clark', type: 'artista', decade: 1970, description: 'Conocido por sus "cortes" en edificios, explorando el espacio negativo y la "anarquitectura".' },
-            { id: 'tema_disolucion_escultura', name: 'Disolución de la Escultura', type: 'tema', decade: 1970, description: 'Cuestionamiento de la escultura tradicional a través del espacio negativo, la huella y el vacío.' },
-            { id: 'paik', name: 'Nam June Paik', type: 'artista', decade: 1970, description: 'Considerado el padre del videoarte.' },
-
-            // 1980s
-            { id: 'basquiat', name: 'Jean-Michel Basquiat', type: 'artista', decade: 1980, description: 'Artista neoexpresionista que surgió del graffiti, influenciado por Warhol.' },
-            { id: 'tema_arte_politico', name: 'Arte Político / Transgresor', type: 'tema', decade: 1980, description: 'Arte que aborda directamente cuestiones sociales y políticas, a menudo de forma crítica o provocadora.' },
-            { id: 'margolles', name: 'Teresa Margolles', type: 'artista', decade: 1980, description: 'Artista mexicana que utiliza restos orgánicos y objetos relacionados con la muerte violenta para denunciar la violencia social.' },
-
-            // 1990s
-            { id: 'semejo', name: 'SEMEFO', type: 'movimiento', decade: 1990, description: 'Colectivo artístico (del que Margolles formó parte) que trabajaba con materiales de la morgue para comentar sobre la violencia en México.' },
-            { id: 'tema_kitsch', name: 'Kitsch y Banalidad', type: 'tema', decade: 1990, description: 'Celebración o crítica de la cultura de masas, el mal gusto y lo banal, a menudo con ironía.' },
-            { id: 'koons', name: 'Jeff Koons', type: 'artista', decade: 1990, description: 'Artista conocido por sus obras que juegan con el kitsch, la banalidad y el mercado del arte.' },
-            { id: 'tema_nuevas_tecnologias', name: 'Nuevas Tecnologías / Bioarte', type: 'tema', decade: 1990, description: 'Uso de medios digitales, internet y biotecnología como herramientas y temas artísticos.' },
-            { id: 'kac', name: 'Eduardo Kac', type: 'artista', decade: 1990, description: 'Pionero del bioarte, conocido por obras que utilizan la ingeniería genética, como el conejo fluorescente "Alba".' },
-            { id: 'arte_relacional', name: 'Arte Relacional', type: 'movimiento', decade: 1990, description: 'Arte que toma como punto de partida las interacciones humanas y su contexto social.' },
-            { id: 'alys', name: 'Francis Alÿs', type: 'artista', decade: 1990, description: 'Artista belga-mexicano cuyas obras, a menudo caminatas o acciones poéticas, exploran temas políticos y sociales.' },
-            { id: 'orozco', name: 'Gabriel Orozco', type: 'artista', decade: 1990, description: 'Artista conceptual mexicano clave, que utiliza objetos cotidianos para explorar la geometría, la fotografía y el espacio.' },
-            
-            // 2000s
-            { id: 'tema_nuevo_paisaje', name: 'Nuevo Paisaje / Espacio', type: 'tema', decade: 2000, description: 'Reinterpretación del paisaje y el espacio a través de la inmersión, la percepción y el uso de nuevos materiales.' },
-            { id: 'eliasson', name: 'Olafur Eliasson', type: 'artista', decade: 2000, description: 'Artista conocido por sus instalaciones inmersivas a gran escala que exploran la percepción y los fenómenos naturales.' },
-            { id: 'cruzvillegas', name: 'Abraham Cruzvillegas', type: 'artista', decade: 2000, description: 'Conocido por su concepto de "autoconstrucción", inspirado en las tácticas de construcción precaria e ingeniosa.' },
-            { id: 'net_art', name: 'Net.art / Arte Electrónico', type: 'tema', decade: 2000, description: 'Arte que utiliza Internet como medio y sujeto, explorando la conectividad y la virtualidad.' },
-            { id: 'lozano_hemmer', name: 'Rafael Lozano-Hemmer', type: 'artista', decade: 2000, description: 'Artista electrónico que crea instalaciones interactivas que exploran la vigilancia, la tecnología y el espacio público.' },
-            { id: 'gursky', name: 'Andreas Gursky', type: 'artista', decade: 2000, description: 'Fotógrafo conocido por sus imágenes a gran escala y alta definición que capturan los sistemas globales de comercio y consumo.' },
-            
-            // 2010s
-            { id: 'tema_etica_genetica', name: 'Ética y Arte Especulativo', type: 'tema', decade: 2010, description: 'Arte que explora las implicaciones éticas de la biotecnología, la genética y la vida artificial.' },
-            { id: 'forensic_arch', name: 'Forensic Architecture', type: 'movimiento', decade: 2010, description: 'Agencia de investigación que utiliza el análisis arquitectónico y de datos para investigar violaciones de derechos humanos.' },
-            { id: 'tema_fotografia_critica', name: 'Fotografía Crítica', type: 'tema', decade: 2010, description: 'Fotografía que va más allá de lo documental para cuestionar la realidad, la representación y los sistemas de poder.' },
+            // ARTE CONTEMPORÁNEO (1980 - Actualidad)
+            { id: 'matta_clark', name: 'Gordon Matta-Clark', type: 'artista', decade: 1970, description: 'Conocido por sus "cortes" en edificios ("anarquitectura"), que cuestionan el espacio y la propiedad.' },
+            { id: 'whiteread', name: 'Rachel Whiteread', type: 'artista', decade: 1990, description: 'Escultora británica que crea moldes de espacios negativos, haciendo tangible el vacío y la memoria.' },
+            { id: 'house', name: 'House (Obra)', type: 'obra', decade: 1993, description: 'Obra de Rachel Whiteread, un molde de hormigón del interior de una casa victoriana, que explora la memoria y el espacio doméstico.' },
+            { id: 'willats', name: 'Stephen Willats', type: 'artista', decade: 1980, description: 'Artista pionero del arte relacional, que trabaja con comunidades para mapear y representar sus interacciones sociales.' },
+            { id: 'becher', name: 'Bernd & Hilla Becher', type: 'artista', decade: 1970, description: 'Pareja de fotógrafos alemanes conocidos por sus "tipologías" de estructuras industriales, influyentes en la fotografía conceptual.' },
+            { id: 'miss', name: 'Mary Miss', type: 'artista', decade: 1980, description: 'Artista que fusiona escultura, arquitectura y paisaje para crear obras públicas que involucran al espectador.' },
+            { id: 'carrion', name: 'Ulises Carrión', type: 'artista', decade: 1970, description: 'Artista mexicano, figura clave del arte conceptual y el "arte correo", que exploró el libro como un espacio artístico.' },
+            { id: 'kac', name: 'Eduardo Kac', type: 'artista', decade: 2000, description: 'Pionero del bioarte, conocido por obras que utilizan la ingeniería genética para cuestionar la relación entre vida, ciencia y arte.' },
+            { id: 'haring', name: 'Keith Haring', type: 'artista', decade: 1980, description: 'Artista y activista social cuyo trabajo responde a la cultura callejera de Nueva York de los años 80.'},
+            { id: 'sherman', name: 'Cindy Sherman', type: 'artista', decade: 1980, description: 'Fotógrafa que utiliza autorretratos para deconstruir estereotipos de la mujer en la cultura popular.'},
+            { id: 'kruger', name: 'Barbara Kruger', type: 'artista', decade: 1980, description: 'Artista conceptual que utiliza la tipografía y la imagen para lanzar una crítica feminista y social.'},
+            { id: 'hirst', name: 'Damien Hirst', type: 'artista', decade: 1990, description: 'Figura prominente de los Young British Artists, conocido por sus obras que exploran la relación entre arte, vida y muerte.'},
+            { id: 'weiwei', name: 'Ai Weiwei', type: 'artista', decade: 2000, description: 'Artista y activista chino cuyo trabajo critica abiertamente al gobierno de su país y aborda temas de derechos humanos.'},
         ],
         links: [
-            // Conexiones Base (pre-1960)
-            { source: 'dadaismo', target: 'surrealismo', type: 'influence', label: 'Inspiración directa' },
-            { source: 'surrealismo', target: 'siqueiros', type: 'influence', label: 'Influencia estilística' },
-            { source: 'breton', target: 'kahlo', type: 'influence', label: 'Reconocimiento mutuo' },
-            { source: 'surrealismo', target: 'exp_abstracto', type: 'influence', label: 'Herencia del automatismo' },
-            { source: 'siqueiros', target: 'pollock', type: 'influence', label: 'Influencia técnica (action painting)' },
-            { source: 'exp_abstracto', target: 'pollock', type: 'influence', label: 'Figura clave' },
-            { source: 'muralismo', target: 'exp_abstracto', type: 'reaction', label: 'Contraste (arte social vs. subjetivo)' },
-            { source: 'muralismo', target: 'ruptura', type: 'reaction', label: 'Ruptura con la escuela oficial' },
-            { source: 'exp_abstracto', target: 'pop_art', type: 'reaction', label: 'Reacción a la subjetividad abstracta' },
-            { source: 'dadaismo', target: 'pop_art', type: 'influence', label: 'Herencia del "ready-made"' },
-            { source: 'pop_art', target: 'warhol', type: 'influence', label: 'Figura clave' },
-            { source: 'constructivismo', target: 'minimalismo', type: 'influence', label: 'Influencia en la abstracción geométrica' },
-            { source: 'dadaismo', target: 'arte_conceptual', type: 'influence', label: 'Herencia de la primacía de la idea' },
-            { source: 'minimalismo', target: 'neoexpresionismo', type: 'reaction', label: 'Reacción a la frialdad y despojo' },
-            { source: 'arte_conceptual', target: 'neoexpresionismo', type: 'reaction', label: 'Reacción contra la desmaterialización' },
-            { source: 'expresionismo_aleman', target: 'neoexpresionismo', type: 'influence', label: 'Inspiración histórica directa' },
-            { source: 'warhol', target: 'basquiat', type: 'influence', label: 'Influencia y colaboración directa' },
-            { source: 'neoexpresionismo', target: 'basquiat', type: 'influence', label: 'Pertenencia al movimiento' },
-
-            // AÑOS 60-70
-            { source: 'tema_arte_experiencia', target: 'situacionismo', type: 'influence', label: 'Parte del enfoque' },
-            { source: 'tema_arte_experiencia', target: 'arte_procesual', type: 'influence', label: 'Parte del enfoque' },
-            { source: 'tema_arte_experiencia', target: 'land_art', type: 'influence', label: 'Parte del enfoque' },
-            { source: 'situacionismo', target: 'debord', type: 'influence', label: 'Figura clave' },
-            { source: 'arte_procesual', target: 'beuys', type: 'influence', label: 'Figura clave' },
-            { source: 'land_art', target: 'heizer', type: 'influence', label: 'Pionero' },
-            { source: 'land_art', target: 'smithson', type: 'influence', label: 'Figura clave' },
-            { source: 'beuys', target: 'tema_arte_politico', type: 'influence', label: 'Conexión temática (escultura social)' },
-            { source: 'fluxus', target: 'klein', type: 'influence', label: 'Precursor / Espíritu afín' },
-
-            // AÑOS 70-80
-            { source: 'tema_cuerpo_medio', target: 'fluxus', type: 'influence', label: 'Parte del enfoque' },
-            { source: 'tema_cuerpo_medio', target: 'body_art', type: 'influence', label: 'Parte del enfoque' },
-            { source: 'tema_cuerpo_medio', target: 'tema_feminismo', type: 'influence', label: 'Herramienta de expresión' },
-            { source: 'body_art', target: 'abramovic', type: 'influence', label: 'Pionera' },
-            { source: 'tema_feminismo', target: 'sherman', type: 'influence', label: 'Exponente clave' },
-            { source: 'tema_feminismo', target: 'kruger', type: 'influence', label: 'Exponente clave' },
-            { source: 'tema_disolucion_escultura', target: 'matta_clark', type: 'influence', label: 'Exponente clave' },
-            { source: 'heizer', target: 'tema_disolucion_escultura', type: 'influence', label: 'Precursor (escultura negativa)' },
-            { source: 'tema_nuevas_tecnologias', target: 'paik', type: 'influence', label: 'Pionero (videoarte)' },
+            // Conexiones de NÚCLEOS TEMÁTICOS
+            { source: 'nucleo_espiritual', target: 'redon', type: 'affinity', label: 'Exploración de lo onírico' },
+            { source: 'nucleo_espiritual', target: 'gauguin', type: 'affinity', label: 'Uso simbólico del color' },
+            { source: 'nucleo_espiritual', target: 'friedrich', type: 'affinity', label: 'Lo sublime en la naturaleza' },
+            { source: 'nucleo_espiritual', target: 'kandinsky', type: 'affinity', label: 'Capacidad espiritual del arte abstracto' },
+            { source: 'nucleo_espiritual', target: 'matisse', type: 'affinity', label: 'Búsqueda de la esencia y la armonía' },
+            { source: 'nucleo_espiritual', target: 'mondrian', type: 'affinity', label: 'Abstracción como vía a lo universal' },
+            { source: 'nucleo_espiritual', target: 'turrell', type: 'affinity', label: 'La luz como experiencia trascendental' },
+            { source: 'nucleo_cuerpo', target: 'yves_klein', type: 'affinity', label: 'El cuerpo como "pincel viviente"' },
+            { source: 'nucleo_cuerpo', target: 'oiticica', type: 'affinity', label: 'Arte para ser vestido y vivido' },
+            { source: 'nucleo_cuerpo', target: 'clark', type: 'affinity', label: 'Objetos para la interacción sensorial' },
+            { source: 'nucleo_cuerpo', target: 'beuys', type: 'affinity', label: 'El artista como chamán y sanador social' },
+            { source: 'nucleo_cuerpo', target: 'yoko_ono', type: 'affinity', label: 'Obras participativas y corporales' },
+            { source: 'nucleo_cuerpo', target: 'mendieta', type: 'affinity', label: 'El cuerpo en relación con la tierra' },
+            { source: 'nucleo_cuerpo', target: 'acconci', type: 'affinity', label: 'Exploración de los límites corporales y psicológicos' },
+            { source: 'nucleo_politico', target: 'heartfield', type: 'affinity', label: 'Fotomontaje como arma política' },
+            { source: 'nucleo_politico', target: 'grosz', type: 'affinity', label: 'Sátira social y crítica al poder' },
+            { source: 'nucleo_politico', target: 'carrion', type: 'affinity', label: 'Creación de redes alternativas al sistema' },
+            { source: 'nucleo_politico', target: 'matta_clark', type: 'affinity', label: 'Crítica a la propiedad y el urbanismo' },
+            { source: 'nucleo_politico', target: 'willats', type: 'affinity', label: 'Mapeo de estructuras sociales' },
+            { source: 'nucleo_politico', target: 'weiwei', type: 'affinity', label: 'Activismo y crítica a regímenes autoritarios' },
+            { source: 'nucleo_naturaleza', target: 'smithson', type: 'affinity', label: 'Intervención y entropía en el paisaje' },
+            { source: 'nucleo_naturaleza', target: 'heizer', type: 'affinity', label: 'Escultura monumental con la tierra' },
+            { source: 'nucleo_naturaleza', target: 'miss', type: 'affinity', label: 'Fusión de paisaje y arquitectura' },
+            { source: 'nucleo_naturaleza', target: 'friedrich', type: 'affinity', label: 'Representación de lo sublime natural' },
+            { source: 'nucleo_naturaleza', target: 'constable', type: 'affinity', label: 'Observación directa del paisaje' },
+            { source: 'nucleo_abstraccion', target: 'cezanne', type: 'affinity', label: 'Descomposición geométrica de la forma' },
+            { source: 'nucleo_abstraccion', target: 'picasso', type: 'affinity', label: 'Fragmentación y múltiples puntos de vista' },
+            { source: 'nucleo_abstraccion', target: 'judd', type: 'affinity', label: 'Énfasis en la materia y el objeto específico' },
+            { source: 'nucleo_abstraccion', target: 'morris', type: 'affinity', label: 'Investigación sobre la forma y el proceso' },
+            { source: 'nucleo_abstraccion', target: 'pollock', type: 'affinity', label: 'La materia pictórica como protagonista' },
+            { source: 'nucleo_abstraccion', target: 'kosuth', type: 'affinity', label: 'Desmaterialización del objeto en la idea' },
+            { source: 'nucleo_narrativas', target: 'duchamp', type: 'affinity', label: 'Tensión entre lo visual y lo conceptual' },
+            { source: 'nucleo_narrativas', target: 'ensor', type: 'affinity', label: 'Lo grotesco y la crítica social' },
+            { source: 'nucleo_narrativas', target: 'munch', type: 'affinity', label: 'Expresión de la angustia existencial' },
+            { source: 'nucleo_narrativas', target: 'magritte', type: 'affinity', label: 'Tensión entre imagen y lenguaje' },
+            { source: 'nucleo_feminismos', target: 'hoech', type: 'affinity', label: 'Crítica a los roles de género' },
+            { source: 'nucleo_feminismos', target: 'cahun', type: 'affinity', label: 'Cuestionamiento de la identidad de género' },
+            { source: 'nucleo_feminismos', target: 'yoko_ono', type: 'affinity', label: 'Perspectiva feminista en el performance' },
+            { source: 'nucleo_feminismos', target: 'sherman', type: 'affinity', label: 'Deconstrucción de estereotipos femeninos' },
+            { source: 'nucleo_feminismos', target: 'kruger', type: 'affinity', label: 'Crítica feminista a través del lenguaje publicitario' },
+            { source: 'nucleo_tecnologia', target: 'kac', type: 'affinity', label: 'Bioarte y vida transgénica' },
+            { source: 'nucleo_tecnologia', target: 'turrell', type: 'affinity', label: 'Tecnología para controlar la percepción de la luz' },
+            { source: 'nucleo_streetart', target: 'haring', type: 'affinity', label: 'Icono del arte callejero y el activismo' },
             
-            // AÑOS 80-90
-            { source: 'tema_arte_politico', target: 'margolles', type: 'influence', label: 'Exponente clave' },
-            { source: 'tema_arte_politico', target: 'semejo', type: 'influence', label: 'Exponente clave' },
-            { source: 'margolles', target: 'semejo', type: 'influence', label: 'Miembro fundador' },
-            { source: 'body_art', target: 'margolles', type: 'influence', label: 'Herencia del cuerpo como evidencia' },
-            { source: 'sherman', target: 'tema_fotografia_critica', type: 'influence', label: 'Pionera en la deconstrucción' },
-
-            // AÑOS 90-2000
-            { source: 'tema_arte_experiencia', target: 'arte_relacional', type: 'influence', label: 'Revitalización del enfoque' },
-            { source: 'arte_relacional', target: 'alys', type: 'influence', label: 'Exponente (deriva contemporánea)' },
-            { source: 'debord', target: 'alys', type: 'influence', label: 'Herencia conceptual (deriva)' },
-            { source: 'pop_art', target: 'tema_kitsch', type: 'influence', label: 'Herencia temática' },
-            { source: 'tema_kitsch', target: 'koons', type: 'influence', label: 'Exponente clave' },
-            { source: 'tema_nuevas_tecnologias', target: 'kac', type: 'influence', label: 'Exponente (bioarte)' },
-            { source: 'tema_cuerpo_medio', target: 'kac', type: 'influence', label: 'Extensión tecnológica del cuerpo' },
-            { source: 'dadaismo', target: 'orozco', type: 'influence', label: 'Herencia del objeto cotidiano' },
-
-            // 2000-2010
-            { source: 'land_art', target: 'tema_nuevo_paisaje', type: 'influence', label: 'Evolución del concepto' },
-            { source: 'tema_nuevo_paisaje', target: 'eliasson', type: 'influence', label: 'Exponente (inmersión)' },
-            { source: 'tema_nuevas_tecnologias', target: 'net_art', type: 'influence', label: 'Especialización' },
-            { source: 'net_art', target: 'lozano_hemmer', type: 'influence', label: 'Exponente (interactividad)' },
-            { source: 'muralismo', target: 'cruzvillegas', type: 'reaction', label: 'Contraste (monumental vs. autoconstrucción)' },
-            { source: 'tema_fotografia_critica', target: 'gursky', type: 'influence', label: 'Exponente (escala global)' },
-
-            // 2010-Actualidad
-            { source: 'tema_nuevas_tecnologias', target: 'tema_etica_genetica', type: 'influence', label: 'Derivación crítica' },
-            { source: 'tema_arte_politico', target: 'forensic_arch', type: 'influence', label: 'Derivación (arte investigativo)' },
+            // CONEXIONES HISTÓRICAS Y ESTÉTICAS
+            { source: 'romanticismo', target: 'nucleo_naturaleza', type: 'influence', label: 'Origen del paisaje como tema central' },
+            { source: 'romanticismo', target: 'expresionismo', type: 'influence', label: 'Herencia de la subjetividad emocional' },
+            { source: 'friedrich', target: 'monk_by_the_sea', type: 'influence', label: 'Autor de la obra'},
+            { source: 'friedrich', target: 'munch', type: 'affinity', label: 'Afinidad en la atmósfera de soledad' },
+            { source: 'simbolismo', target: 'surrealismo', type: 'influence', label: 'Precursor en la exploración de lo onírico' },
+            { source: 'redon', target: 'surrealismo', type: 'influence', label: 'Influencia directa en la imaginería' },
+            { source: 'gauguin', target: 'redon', type: 'affinity', label: 'Afinidad en el uso simbólico del color' },
+            { source: 'cezanne', target: 'cubismo', type: 'influence', label: 'Base formal para la descomposición del objeto' },
+            { source: 'cezanne', target: 'picasso', type: 'influence', label: 'Influencia directa en la geometrización' },
+            { source: 'cezanne', target: 'braque', type: 'influence', label: 'Influencia directa en la geometrización' },
+            { source: 'van_gogh', target: 'expresionismo', type: 'influence', label: 'Precursor de la expresividad emocional' },
+            { source: 'munch', target: 'van_gogh', type: 'affinity', label: 'Afinidad en la expresividad emocional' },
+            { source: 'dadaismo', target: 'arte_conceptual', type: 'influence', label: 'Herencia de la primacía de la idea sobre el objeto' },
+            { source: 'duchamp', target: 'kosuth', type: 'influence', label: 'El "ready-made" como base del conceptualismo' },
+            { source: 'duchamp', target: 'pop_art', type: 'affinity', label: 'Afinidad en el uso de objetos cotidianos'},
+            { source: 'mondrian', target: 'minimalismo', type: 'affinity', label: 'Afinidad en la búsqueda de la forma pura' },
+            { source: 'mondrian', target: 'malevich', type: 'affinity', label: 'Diálogo en la abstracción geométrica espiritual'},
+            { source: 'yves_klein', target: 'salto_al_vacio', type: 'influence', label: 'Autor de la obra' },
+            { source: 'yves_klein', target: 'oiticica', type: 'affinity', label: 'Diálogo sobre el color y el cuerpo' },
+            { source: 'yves_klein', target: 'clark', type: 'affinity', label: 'Diálogo sobre el cuerpo y la experiencia' },
+            { source: 'land_art', target: 'turrell', type: 'influence', label: 'Figura clave del movimiento' },
+            { source: 'whiteread', target: 'house', type: 'influence', label: 'Autora de la obra' },
+            { source: 'matta_clark', target: 'whiteread', type: 'affinity', label: 'Diálogo sobre el espacio negativo' },
+            { source: 'arte_conceptual', target: 'willats', type: 'influence', label: 'Aplicación de métodos conceptuales a lo social' },
+            { source: 'performance', target: 'acconci', type: 'influence', label: 'Figura clave'},
+            { source: 'performance', target: 'burden', type: 'influence', label: 'Figura clave'},
         ]
     };
 
-    // --- Lógica de la Visualización ---
+    // --- Visualization Logic ---
     document.addEventListener('DOMContentLoaded', () => {
         const svg = d3.select("#art-map");
-        const svgWrapper = document.getElementById('svg-wrapper');
-        const width = svgWrapper.clientWidth;
+        let width = window.innerWidth;
         
-        const nodeRadius = 14;
-        const decadeHeight = 300;
-        const padding = { top: 60, right: 50, bottom: 50, left: 50 };
+        const nodes = artData.nodes;
+        const links = artData.links;
+        const nodesById = new Map(nodes.map(d => [d.id, d]));
 
-        const decades = Array.from(d3.group(artData.nodes, d => d.decade).keys()).sort(d3.ascending);
-        const height = decades.length * decadeHeight + padding.top + padding.bottom;
-        svg.attr("height", height);
+        const decades = Array.from(new Set(nodes.map(d => d.decade))).sort(d3.ascending);
+        const decadeHeight = 1000; // Increased height for more space
+        const timelineHeight = decades.length * decadeHeight;
+        svg.attr("width", width).attr("height", timelineHeight);
 
-        const nodesById = new Map(artData.nodes.map(node => [node.id, node]));
+        const g = svg.append("g");
 
-        // Calcular posiciones estáticas
+        // --- Layout Calculation ---
+        const nodeRadius = 20;
         decades.forEach((decade, i) => {
-            const yPos = i * decadeHeight + padding.top + decadeHeight / 2;
-            const decadeNodes = artData.nodes.filter(n => n.decade === decade);
-            const xStep = (width - padding.left - padding.right) / (decadeNodes.length + 1);
+            const decadeNodes = nodes.filter(n => n.decade === decade);
+            const yPos = i * decadeHeight + decadeHeight / 2;
+            
+            const numNodes = decadeNodes.length;
+            let cols = Math.ceil(Math.sqrt(numNodes * (width / decadeHeight)));
+            if (width < 768) cols = Math.min(cols, 5); // Limit columns on mobile
+            else cols = Math.min(cols, 12); // Limit columns on desktop
+
+
+            const xPadding = 100;
+            const yPadding = 150;
+
+            const effectiveWidth = width - 2 * xPadding;
+            const colWidth = cols > 1 ? effectiveWidth / (cols - 1) : 0;
             
             decadeNodes.forEach((node, j) => {
-                node.x = padding.left + (j + 1) * xStep;
-                node.y = yPos;
+                const row = Math.floor(j / cols);
+                const col = j % cols;
+                
+                let xOffset = (cols % 2 === 0) ? -colWidth / 2 : 0;
+                let centeredCol = col - Math.floor((cols - 1) / 2);
+
+                node.fx = (width / 2) + (centeredCol * colWidth) + xOffset;
+                node.fy = yPos - (decadeHeight/2) + yPadding + (row * 140);
             });
         });
 
-        // Dibujar carriles de década
-        const decadeGroup = svg.append("g").attr("id", "decade-markers");
-        decades.forEach((decade, i) => {
-            const yPos = i * decadeHeight + padding.top;
-            decadeGroup.append("line").attr("class", "decade-line").attr("x1", 0).attr("x2", width).attr("y1", yPos).attr("y2", yPos);
-            decadeGroup.append("text").attr("class", "decade-label").attr("x", width / 2).attr("y", yPos + decadeHeight / 2 + 15).text(`${decade}s`);
-        });
-        decadeGroup.append("line").attr("class", "decade-line").attr("x1", 0).attr("x2", width).attr("y1", height - padding.bottom).attr("y2", height - padding.bottom);
+        // Background decade markers
+        const decadeMarkers = g.append("g").selectAll("g")
+            .data(decades)
+            .join("g");
+        
+        decadeMarkers.append("text")
+            .attr("class", "decade-label")
+            .attr("x", 50)
+            .attr("y", d => (decades.indexOf(d) * decadeHeight) + decadeHeight / 2 + 60)
+            .text(d => `${d}s`);
 
-        // Dibujar enlaces
-        const linkGroup = svg.append("g").attr("class", "links");
-        const links = linkGroup.selectAll("path")
-            .data(artData.links)
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).strength(0.01).distance(100))
+            .force("collide", d3.forceCollide().radius(nodeRadius + 40).strength(0.9));
+
+        const link = g.append("g").attr("class", "links")
+            .selectAll("path")
+            .data(links)
             .join("path")
-            .attr("class", d => `link ${d.type}`)
-            .attr("d", d => {
-                const source = nodesById.get(d.source);
-                const target = nodesById.get(d.target);
-                if (!source || !target) return "";
-                const dx = target.x - source.x;
-                const dy = target.y - source.y;
-                const dr = Math.sqrt(dx * dx + dy * dy) * 1.8;
-                return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
-            });
+            .attr("class", d => `link ${d.type}`);
 
-        // Dibujar nodos
-        const nodeGroup = svg.append("g").attr("class", "nodes");
-        const node = nodeGroup.selectAll("g")
-            .data(artData.nodes)
+        const node = g.append("g").attr("class", "nodes")
+            .selectAll("g")
+            .data(nodes)
             .join("g")
-            .attr("class", d => `node ${d.type}`)
-            .attr("transform", d => `translate(${d.x},${d.y})`);
+            .attr("class", d => `node ${d.type}`);
 
-        const nodeColors = { artista: '#f59e0b', movimiento: '#0ea5e9', tema: '#10b981' };
-        node.append("circle").attr("r", nodeRadius).style("fill", d => nodeColors[d.type]);
-        node.append("text").text(d => d.name).attr("y", -nodeRadius - 5);
+        const nodeColors = { 
+            artista: '#f59e0b', 
+            movimiento: 'var(--color-link-influence)', 
+            obra: '#e2e8f0',
+            tema: d => d.color
+        };
+        node.append("circle").attr("r", nodeRadius)
+            .style("fill", d => typeof nodeColors[d.type] === 'function' ? nodeColors[d.type](d) : nodeColors[d.type]);
+            
+        node.append("text").attr("class", "label").text(d => d.name).attr("y", nodeRadius + 14);
 
-        // --- Lógica de Interacción y Panel Inferior ---
-        const infoContainer = document.getElementById('info-container');
-        const infoContent = document.getElementById('info-content');
-        const closeInfoBtn = document.getElementById('close-info-btn');
-        let activeNodeId = null;
+        simulation.on("tick", () => {
+            node.attr("transform", d => `translate(${d.x},${d.y})`);
+            link.attr("d", d => {
+                const dx = d.target.x - d.source.x;
+                const dy = d.target.y - d.source.y;
+                const dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
+                return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            });
+        });
 
+        // --- Interaction & Modal Logic ---
+        const modal = d3.select("#info-modal");
+        const modalBody = document.getElementById('modal-body');
+        document.getElementById('close-info-btn').addEventListener('click', resetFocus);
+        
         node.on('click', (event, d) => {
             event.stopPropagation();
-            if (activeNodeId === d.id) {
-                hideInfoPanel();
-            } else {
-                activeNodeId = d.id;
-                highlightNodeAndConnections(d.id);
-                updateInfoPanel(d);
-                showInfoPanel();
-            }
+            focusOnNode(d);
         });
 
-        svg.on('click', hideInfoPanel);
-        closeInfoBtn.addEventListener('click', hideInfoPanel);
+        svg.on('click', resetFocus);
 
-        function highlightNodeAndConnections(nodeId) {
-            const connectedNodeIds = new Set([nodeId]);
-            const connectedLinkSet = new Set();
-            links.each(function(l) {
-                if (l.source === nodeId) { connectedNodeIds.add(l.target); connectedLinkSet.add(l); }
-                if (l.target === nodeId) { connectedNodeIds.add(l.source); connectedLinkSet.add(l); }
+        function focusOnNode(d) {
+            const connectedIds = new Set([d.id]);
+            links.forEach(l => {
+                if (l.source.id === d.id) connectedIds.add(l.target.id);
+                if (l.target.id === d.id) connectedIds.add(l.source.id);
             });
-            node.classed('dimmed', n => !connectedNodeIds.has(n.id));
-            node.classed('highlighted', n => n.id === nodeId);
-            links.classed('dimmed', l => !connectedLinkSet.has(l));
-            links.classed('link-highlighted', l => connectedLinkSet.has(l));
-            node.filter('.highlighted').raise();
-            links.filter('.link-highlighted').raise();
+            
+            node.classed("dimmed", n => !connectedIds.has(n.id));
+            node.classed("focused", n => n.id === d.id);
+            node.filter(".focused").style("--stroke-color", d.color || "#fff");
+
+            link.classed("dimmed", l => !(connectedIds.has(l.source.id) && connectedIds.has(l.target.id)));
+            link.classed("link-highlighted", l => connectedIds.has(l.source.id) && connectedIds.has(l.target.id));
+
+            node.filter(n => connectedIds.has(n.id)).raise();
+
+            updateModal(d);
+            modal.style("opacity", 1).style("pointer-events", "all").style("transform", "scale(1)");
         }
 
-        function resetHighlights() {
-            node.classed('dimmed', false).classed('highlighted', false);
-            links.classed('dimmed', false).classed('link-highlighted', false);
+        function resetFocus() {
+            node.classed("dimmed", false).classed("focused", false);
+            link.classed("dimmed", false).classed("link-highlighted", false);
+            modal.style("opacity", 0).style("pointer-events", "none").style("transform", "scale(0.95)");
         }
         
-        function showInfoPanel() {
-            infoContainer.classList.add('visible');
-        }
-
-        function hideInfoPanel() {
-            activeNodeId = null;
-            resetHighlights();
-            infoContainer.classList.remove('visible');
-        }
-
-        function updateInfoPanel(d) {
-            if (!d) return;
-
-            const relatedLinks = artData.links.filter(l => l.source === d.id || l.target === d.id);
-            let connectionsHtml = '<p class="text-sm text-gray-500">No hay conexiones directas en este conjunto de datos.</p>';
+        function updateModal(d) {
+            const relatedLinks = links.filter(l => l.source.id === d.id || l.target.id === d.id);
+            let connectionsHtml = '<p class="text-sm text-slate-400">No hay conexiones directas en esta base de datos.</p>';
             
             if (relatedLinks.length > 0) {
                 connectionsHtml = relatedLinks.map(link => {
-                    const otherNode = nodesById.get(link.source === d.id ? link.target : link.source);
-                    const relationColor = link.type === 'influence' ? 'text-cyan-700' : 'text-red-700';
-                    const relationLabel = link.label || (link.type === 'influence' ? 'Influye a' : 'Reacciona a');
+                    const otherNode = nodesById.get(link.source.id === d.id ? link.target.id : link.source.id);
+                    let relationColor = 'text-slate-400';
+                    if (link.type === 'influence') relationColor = 'text-cyan-400';
+                    if (link.type === 'reaction') relationColor = 'text-pink-400';
+
+                    const relationLabel = link.label || (link.type === 'influence' ? 'Influye a' : (link.type === 'reaction' ? 'Reacciona a' : 'Afinidad con'));
                     let connectionText;
-                     if (link.source === d.id) {
-                        connectionText = `<div><span class="font-medium ${relationColor}">${relationLabel}</span> <strong class="text-gray-900">${otherNode.name}</strong></div>`;
+                    if (link.source.id === d.id) {
+                        connectionText = `<div><span class="font-medium ${relationColor}">${relationLabel}</span> <strong class="text-white">${otherNode.name}</strong></div>`;
                     } else {
-                        const inverseLabel = link.label ? `(Relacionado por: ${link.label})` : (link.type === 'influence' ? 'Influido por' : 'Provoca reacción de');
-                        connectionText = `<div><strong class="text-gray-900">${otherNode.name}</strong> <span class="font-medium ${relationColor}">${inverseLabel}</span></div>`;
+                        const inverseLabel = link.label ? `(${link.label})` : (link.type === 'influence' ? '(Influido por)' : (link.type === 'reaction' ? '(Provoca reacción de)' : '(Afinidad con)'));
+                        connectionText = `<div><strong class="text-white">${otherNode.name}</strong> <span class="font-medium ${relationColor}">${inverseLabel}</span></div>`;
                     }
-                    return `<li class="flex items-start text-sm p-2 rounded-md hover:bg-gray-200">
-                                <div class="w-2.5 h-2.5 rounded-full mr-3 mt-1 flex-shrink-0" style="background-color: ${nodeColors[otherNode.type]}"></div>
+                    const otherNodeColor = typeof nodeColors[otherNode.type] === 'function' ? nodeColors[otherNode.type](otherNode) : nodeColors[otherNode.type];
+                    return `<li class="flex items-start text-sm p-2 rounded-md hover:bg-slate-800 transition">
+                                <div class="w-2.5 h-2.5 rounded-full mr-3 mt-1.5 flex-shrink-0" style="background-color: ${otherNodeColor}"></div>
                                 ${connectionText}
                             </li>`;
                 }).join('');
             }
 
-            infoContent.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            const imageHtml = d.imageUrl ? `<img src="${d.imageUrl}" alt="${d.name}" class="w-full h-48 object-cover rounded-lg mb-4" onerror="this.style.display='none'">` : '';
+            const wikiLinkHtml = d.wikiUrl ? `<a href="${d.wikiUrl}" target="_blank" class="inline-block mt-4 text-sm text-cyan-400 hover:text-cyan-300 transition">Saber más en Wikipedia &rarr;</a>` : '';
+
+            modalBody.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                     <div class="md:col-span-1">
-                        <h2 class="text-2xl font-bold text-gray-900">${d.name}</h2>
-                        <p class="text-sm font-medium uppercase tracking-wider text-gray-500 mb-4">${d.type} - ${d.decade}s</p>
-                        <p class="text-base text-gray-700">${d.description}</p>
+                        ${imageHtml}
+                        <h2 class="text-3xl font-bold text-white">${d.name}</h2>
+                        <p class="text-sm font-medium uppercase tracking-wider text-slate-400 mt-1 mb-4">${d.type} - ${d.decade}s</p>
+                        <p class="text-base text-slate-300 font-light">${d.description}</p>
+                        ${wikiLinkHtml}
                     </div>
                     <div class="md:col-span-2">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-800">Conexiones</h3>
+                        <h3 class="text-xl font-semibold mb-3 text-white">Conexiones</h3>
                         <ul class="space-y-1">${connectionsHtml}</ul>
                     </div>
                 </div>
             `;
         }
+        
+        // --- Search and Filter Logic ---
+        const searchInput = document.getElementById('search-input');
+        const filterControls = document.getElementById('filter-controls');
+        const activeFilters = new Set();
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            if (searchTerm.length > 2) {
+                const foundNode = nodes.find(n => n.name.toLowerCase().includes(searchTerm));
+                if (foundNode) {
+                    focusOnNode(foundNode);
+                    window.scrollTo({
+                        top: foundNode.y - window.innerHeight / 2,
+                        behavior: 'smooth'
+                    });
+                }
+            } else {
+                resetFocus();
+            }
+        });
+
+        filterControls.addEventListener('click', (e) => {
+            if (e.target.classList.contains('filter-btn')) {
+                const filter = e.target.dataset.filter;
+                e.target.classList.toggle('active');
+                if (activeFilters.has(filter)) {
+                    activeFilters.delete(filter);
+                } else {
+                    activeFilters.add(filter);
+                }
+                applyFilters();
+            }
+        });
+
+        function applyFilters() {
+            if (activeFilters.size === 0) {
+                node.classed('filtered-out', false);
+                link.style('display', 'block');
+                return;
+            }
+            node.classed('filtered-out', d => !activeFilters.has(d.type));
+            const visibleNodeIds = new Set(nodes.filter(d => activeFilters.has(d.type)).map(d => d.id));
+            link.style('display', d => (visibleNodeIds.has(d.source.id) && visibleNodeIds.has(d.target.id)) ? 'block' : 'none');
+        }
+
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            svg.attr('width', width);
+            // Re-run layout on resize
+        });
     });
     </script>
 </body>
